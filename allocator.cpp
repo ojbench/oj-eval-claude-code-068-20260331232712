@@ -64,25 +64,42 @@ void TLSFAllocator::initializeMemoryPool(std::size_t size) {
 }
 
 void TLSFAllocator::mappingFunction(std::size_t size, int& fli, int& sli) {
-    if (size < (1U << SLI_BITS)) {
+    if (size == 0) {
         fli = 0;
-        sli = static_cast<int>(size);
-    } else {
-        fli = fls(static_cast<std::uint32_t>(size));
-        std::size_t range = 1ULL << fli;
-        std::size_t divisions = std::min(range, static_cast<std::size_t>(SLI_SIZE));
-        std::size_t step = range / divisions;
-        sli = static_cast<int>((size - range) / step);
-
-        // 确保 sli 在有效范围内
-        if (sli >= SLI_SIZE) {
-            sli = SLI_SIZE - 1;
-        }
+        sli = 0;
+        return;
     }
+
+    // 计算 FLI: floor(log2(size))
+    fli = fls(static_cast<std::uint32_t>(size));
 
     // 确保 fli 在有效范围内
     if (fli >= FLI_SIZE) {
         fli = FLI_SIZE - 1;
+    }
+
+    // 计算 SLI
+    // divisions = min(2^FLI, 16) 根据 hint
+    std::size_t range_start = 1ULL << fli;
+    std::size_t divisions = std::min(range_start, static_cast<std::size_t>(SLI_SIZE));
+
+    if (divisions == 0) {
+        divisions = 1;
+    }
+
+    std::size_t step = range_start / divisions;
+    if (step == 0) {
+        step = 1;
+    }
+
+    sli = static_cast<int>((size - range_start) / step);
+
+    // 确保 sli 在有效范围内
+    if (sli >= SLI_SIZE) {
+        sli = SLI_SIZE - 1;
+    }
+    if (sli < 0) {
+        sli = 0;
     }
 }
 
