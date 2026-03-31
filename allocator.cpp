@@ -13,14 +13,14 @@ static inline std::size_t alignUp(std::size_t size, std::size_t alignment) {
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
-// 辅助函数：找到最高位的位置
-static inline int fls(std::uint32_t x) {
+// 辅助函数：找到最高位的位置 (0-indexed)
+static inline int my_fls(std::uint32_t x) {
     if (x == 0) return -1;
     return 31 - __builtin_clz(x);
 }
 
-// 辅助函数：找到最低位的位置
-static inline int ffs(std::uint32_t x) {
+// 辅助函数：找到最低位的位置 (0-indexed)
+static inline int my_ffs(std::uint32_t x) {
     if (x == 0) return -1;
     return __builtin_ctz(x);
 }
@@ -51,9 +51,11 @@ void TLSFAllocator::initializeMemoryPool(std::size_t size) {
     }
 
     // 创建初始的大块
+    // 块头存储在内存池的开始处
     FreeBlock* initialBlock = reinterpret_cast<FreeBlock*>(memoryPool);
+    // data 指向块本身的起始位置（包括头部）
     initialBlock->data = memoryPool;
-    initialBlock->size = size;
+    initialBlock->size = size; // 总大小包括头部
     initialBlock->isFree = true;
     initialBlock->prevPhysBlock = nullptr;
     initialBlock->nextPhysBlock = nullptr;
@@ -71,7 +73,7 @@ void TLSFAllocator::mappingFunction(std::size_t size, int& fli, int& sli) {
     }
 
     // 计算 FLI: floor(log2(size))
-    fli = fls(static_cast<std::uint32_t>(size));
+    fli = my_fls(static_cast<std::uint32_t>(size));
 
     // 确保 fli 在有效范围内
     if (fli >= FLI_SIZE) {
@@ -160,11 +162,11 @@ TLSFAllocator::FreeBlock* TLSFAllocator::findSuitableBlock(std::size_t size) {
             return nullptr; // 没有合适的块
         }
 
-        fli = ffs(flBitmap);
+        fli = my_ffs(flBitmap);
         slBitmap = index.sliBitmaps[fli];
     }
 
-    sli = ffs(slBitmap);
+    sli = my_ffs(slBitmap);
     return index.freeLists[fli][sli];
 }
 
@@ -287,8 +289,8 @@ std::size_t TLSFAllocator::getMaxAvailableBlockSize() const {
         return 0;
     }
 
-    int fli = fls(index.fliBitmap);
-    int sli = fls(index.sliBitmaps[fli]);
+    int fli = my_fls(index.fliBitmap);
+    int sli = my_fls(index.sliBitmaps[fli]);
 
     FreeBlock* block = index.freeLists[fli][sli];
     std::size_t maxSize = 0;
